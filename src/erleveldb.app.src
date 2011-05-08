@@ -1,0 +1,8 @@
+{application, erleveldb, [
+    {description, "LevelDB NIF"},
+    {vsn, git},
+    {registered, []},
+    {mod, reloading, []},
+    {applications, [kernel]}
+]}.
+
