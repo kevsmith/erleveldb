@@ -186,12 +186,36 @@ dbget(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     }
 }
 
+static ERL_NIF_TERM
+dbdel(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+    State* st = (State*) enif_priv_data(env);
+    DBRes* res;
+    ErlNifBinary key;
+    
+    if(!enif_get_resource(env, argv[0], st->db_res, (void**) &res)) {
+        return enif_make_badarg(env);
+    } else if(!enif_inspect_iolist_as_binary(env, argv[1], &key)) {
+        return enif_make_badarg(env);
+    }
+    
+    leveldb::Slice skey((const char*) key.data, key.size);
+    
+    leveldb::Status s = res->db->Delete(leveldb::WriteOptions(), skey);
+    if(s.ok()) {
+        return make_atom(env, "ok");
+    } else {
+        return make_error(env, "unknown");
+    }
+}
+
 
 static ErlNifFunc funcs[] =
 {
     {"open_db", 1, open_db},
     {"put", 3, dbput},
-    {"get", 2, dbget}
+    {"get", 2, dbget},
+    {"del", 2, dbdel},
 };
 
 ERL_NIF_INIT(erleveldb, funcs, &load, &reload, &upgrade, &unload);

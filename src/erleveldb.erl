@@ -3,7 +3,7 @@
 -define(NOT_LOADED, not_loaded(?LINE)).
 
 -export([open_db/1]).
--export([put/3, get/2]).
+-export([put/3, get/2, del/2]).
 
 open_db(_Name) ->
     ?NOT_LOADED.
@@ -12,6 +12,9 @@ put(_Db, _Key, _Value) ->
     ?NOT_LOADED.
 
 get(_Db, _Key) ->
+    ?NOT_LOADED.
+
+del(_Db, _Key) ->
     ?NOT_LOADED.
 
 init() ->
