@@ -296,14 +296,14 @@ itseek(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
     
-    if(enif_compare(argv[1], make_atom(env, "first"))) {
+    if(enif_compare(argv[1], make_atom(env, "first")) == 0) {
         res->iter->SeekToFirst();
         if(res->iter->Valid()) {
             return itvalue(env, res);
         } else {
             return make_atom(env, "not_found");
         }
-    } else if(enif_compare(argv[1], make_atom(env, "last"))) {
+    } else if(enif_compare(argv[1], make_atom(env, "last")) == 0) {
         res->iter->SeekToLast();
         if(res->iter->Valid()) {
             return itvalue(env, res);
