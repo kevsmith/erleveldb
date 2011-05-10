@@ -2,6 +2,7 @@
 #include "erl_nif_compat.h"
 
 #include "leveldb/db.h"
+#include "leveldb/write_batch.h"
 
 #ifdef __cplusplus
 #define BEGIN_C extern "C" {
@@ -14,6 +15,7 @@
 typedef struct {
     ErlNifResourceType*     db_res;
     ErlNifResourceType*     it_res;
+    ErlNifResourceType*     wb_res;
 } State;
 
 typedef struct {
@@ -26,6 +28,13 @@ typedef struct {
     DBRes*                  dbres;
     leveldb::Iterator*      iter;
 } IterRes;
+
+typedef struct {
+    ErlNifEnv*              env;
+    ErlNifMutex*            lock;
+    DBRes*                  dbres;
+    leveldb::WriteBatch*    batch;
+} WBRes;
 
 void
 free_dbres(ErlNifEnv* env, void* obj)
@@ -43,6 +52,17 @@ free_itres(ErlNifEnv* env, void* obj)
     enif_release_resource(res->dbres);
     if(res->iter != NULL) {
         delete res->iter;
+    }
+}
+
+void
+free_wbres(ErlNifEnv* env, void* obj)
+{
+    WBRes* res = (WBRes*) obj;
+    enif_free_env(res->env);
+    enif_release_resource(res->dbres);
+    if(res->batch != NULL) {
+        delete res->batch;
     }
 }
 
@@ -79,6 +99,7 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     const char* mod = "erleveldb";
     const char* db_name = "DBResource";
     const char* it_name = "IteratorResource";
+    const char* wb_name = "WBResource";
     int flags = ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER;
     ErlNifResourceType* res;
 
@@ -86,23 +107,27 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
         return -1;
     }
     
-    res = enif_open_resource_type(env, mod, db_name, free_dbres, 
-                                    (ErlNifResourceFlags) flags, NULL);
+    st->db_res = enif_open_resource_type(env, mod, db_name, free_dbres, 
+                                        (ErlNifResourceFlags) flags, NULL);
     if(res == NULL) {
         enif_free(st);
         return -1;
     }
     
-    res = enif_open_resource_type(env, mod, it_name, free_itres,
-                                     (ErlNifResourceFlags) flags, NULL);
+    st->it_res = enif_open_resource_type(env, mod, it_name, free_itres,
+                                        (ErlNifResourceFlags) flags, NULL);
     if(res == NULL) {
         enif_free(st);
         return -1;
     }
     
-    st->db_res = res;
-    st->it_res = res;
-    
+    st->wb_res = enif_open_resource_type(env, mod, wb_name, free_wbres,
+                                        (ErlNifResourceFlags) flags, NULL);
+    if(res == NULL) {
+        enif_free(st);
+        return -1;
+    }
+
     *priv = (void*) st;
     return 0;
 }
@@ -359,6 +384,127 @@ itprev(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     return itvalue(env, res);
 }
 
+static ERL_NIF_TERM
+dbbatch(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+    State* st = (State*) enif_priv_data(env);
+    DBRes* dbres;
+    
+    if(!enif_get_resource(env, argv[0], st->db_res, (void**) &dbres)) {
+        return enif_make_badarg(env);
+    }
+    
+    WBRes* res = (WBRes*) enif_alloc_resource(st->wb_res, sizeof(WBRes));
+    res->env = enif_alloc_env();
+    res->lock = NULL;
+    res->dbres = dbres;
+    enif_keep_resource(dbres);
+
+    res->batch = new leveldb::WriteBatch();
+    if(res->batch == NULL) {
+        enif_release_resource(res);
+        return make_error(env, "write_batch_init_failed");
+    }
+
+    ERL_NIF_TERM ret = enif_make_resource(env, res);
+    enif_release_resource(res);
+    
+    return make_ok(env, ret);
+}
+
+static ERL_NIF_TERM
+wbput(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+    State* st = (State*) enif_priv_data(env);
+    WBRes* res;
+    ErlNifBinary key;
+    ErlNifBinary val;
+    
+    if(!enif_get_resource(env, argv[0], st->wb_res, (void**) &res)) {
+        return enif_make_badarg(env);
+    } else if(res->batch == NULL) {
+        return enif_make_badarg(env);
+    }
+    
+    ERL_NIF_TERM argv1 = enif_make_copy(res->env, argv[1]);
+    ERL_NIF_TERM argv2 = enif_make_copy(res->env, argv[2]);
+    
+    if(!enif_inspect_binary(env, argv1, &key)) {
+        return enif_make_badarg(env);
+    } else if(!enif_inspect_binary(env, argv2, &val)) {
+        return enif_make_badarg(env);
+    }
+    
+    leveldb::Slice skey((const char*) key.data, key.size);
+    leveldb::Slice sval((const char*) val.data, val.size);
+    res->batch->Put(skey, sval);
+    return make_atom(env, "ok");
+}
+
+static ERL_NIF_TERM
+wbdel(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+    State* st = (State*) enif_priv_data(env);
+    WBRes* res;
+    ErlNifBinary key;
+    
+    if(!enif_get_resource(env, argv[0], st->wb_res, (void**) &res)) {
+        return enif_make_badarg(env);
+    } else if(res->batch == NULL) {
+        return enif_make_badarg(env);
+    }
+    
+    ERL_NIF_TERM argv1 = enif_make_copy(res->env, argv[1]);
+    
+    if(!enif_inspect_binary(env, argv1, &key)) {
+        return enif_make_badarg(env);
+    }
+    
+    leveldb::Slice skey((const char*) key.data, key.size);
+    res->batch->Delete(skey);
+    return make_atom(env, "ok");
+}
+
+static ERL_NIF_TERM
+wbclear(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+    State* st = (State*) enif_priv_data(env);
+    WBRes* res;
+    
+    if(!enif_get_resource(env, argv[0], st->wb_res, (void**) &res)) {
+        return enif_make_badarg(env);
+    } else if(res->batch == NULL) {
+        return enif_make_badarg(env);
+    }
+    
+    res->batch->Clear();
+    return make_atom(env, "ok");
+}
+
+static ERL_NIF_TERM
+wbwrite(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+    State* st = (State*) enif_priv_data(env);
+    WBRes* res;
+    
+    if(!enif_get_resource(env, argv[0], st->wb_res, (void**) &res)) {
+        return enif_make_badarg(env);
+    } else if(res->batch == NULL) {
+        return enif_make_badarg(env);
+    }
+
+    leveldb::WriteOptions opts;
+    leveldb::Status s = res->dbres->db->Write(opts, res->batch);
+    delete res->batch;
+    res->batch = NULL;
+
+    if(s.ok()) {
+        return make_atom(env, "ok");
+    } else {
+        return make_error(env, "unknown");
+    }
+}
+
 static ErlNifFunc funcs[] =
 {
     {"open_db", 1, open_db},
@@ -368,7 +514,12 @@ static ErlNifFunc funcs[] =
     {"iter", 1, dbiter},
     {"seek", 2, itseek},
     {"next", 1, itnext},
-    {"prev", 1, itprev}
+    {"prev", 1, itprev},
+    {"batch", 1, dbbatch},
+    {"wb_put0", 3, wbput},
+    {"wb_del0", 2, wbdel},
+    {"wb_clear", 1, wbclear},
+    {"wb_write", 1, wbwrite}
 };
 
 ERL_NIF_INIT(erleveldb, funcs, &load, &reload, &upgrade, &unload);
