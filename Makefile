@@ -10,5 +10,5 @@ build:
 clean:
 	./rebar clean
 
-#check: test/etap.beam test/util.beam
-#	prove test/*.t
+check: test/etap.beam
+	prove test/*.t
