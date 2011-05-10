@@ -7,7 +7,7 @@ main(_) ->
     code:add_pathz("test"),
     code:add_pathz("ebin"),
     %timer:sleep(5000),
-    etap:plan(4),
+    etap:plan(5),
     os:cmd("rm -rf " ++ dbname()),
     {ok, Db} = erleveldb:open_db(dbname(), [create_if_missing]),
     etap:is(test_simple_write(Db), ok, "Simple write batch is ok."),
