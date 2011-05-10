@@ -4,12 +4,12 @@
 -define(i2b(B), iolist_to_binary(B)).
 
 -export([open_db/1, open_db/2]).
--export([put/3, get/2, del/2]).
+-export([put/3, get/2, get/3, del/2]).
 -export([iter/1, seek/2, next/1, prev/1]).
 -export([batch/1, wb_put/3, wb_del/2, wb_clear/1, wb_write/1]).
 
-open_db(Name) ->
-    open_db(Name, []).
+open_db(_Name) ->
+    ?NOT_LOADED.
 
 open_db(_Name, _Opts) ->
     ?NOT_LOADED.
@@ -18,6 +18,9 @@ put(_Db, _Key, _Value) ->
     ?NOT_LOADED.
 
 get(_Db, _Key) ->
+    ?NOT_LOADED.
+
+get(_Db, _Key, _Opts) ->
     ?NOT_LOADED.
 
 del(_Db, _Key) ->

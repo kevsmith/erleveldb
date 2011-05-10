@@ -6,36 +6,51 @@ num_writes() -> 1000. % Must be even
 main(_) ->
     code:add_pathz("test"),
     code:add_pathz("ebin"),
-    etap:plan(11),
+    etap:plan(6),
     os:cmd("rm -rf " ++ dbname()),
     {ok, Db} = erleveldb:open_db(dbname(), [create_if_missing]),
-    ok = test_get_missing(Db),
-    ok = test_put_get_del(Db),
-    ok = test_put_del_put_get(Db),
-    ok = test_del_missing(Db),
+    etap:is(test_get_missing(Db), ok, "Missing key returns not_found."),
+    etap:is(test_put_get_del(Db), ok, "Can put/get/del key/values."),
+    etap:is(test_put_del_put_get(Db), ok, "Can overwrite deleted values."),
+    etap:is(test_del_missing(Db), ok, "Deleting a missing key is ok."),
+    etap:is(test_get_opts(Db), ok, "Can get keys with options set."),
     etap:is(test_many_updates(Db, num_writes()), ok, "Many updates were ok."),
     etap:end_tests().
 
 test_get_missing(Db) ->
-    etap:is(erleveldb:get(Db, "foo"), {error, not_found}, "Get k is not_found"),
+    {error, not_found} = erleveldb:get(Db, "foo"),
     ok.
 
 test_put_get_del(Db) ->
-    etap:is(erleveldb:put(Db, "foo", "bar"), ok, "Put k/v is ok."),
-    etap:is(erleveldb:get(Db, "foo"), {ok, <<"bar">>}, "Get k returns v."),
-    etap:is(erleveldb:del(Db, "foo"), ok, "Del k returns ok."),
-    etap:is(erleveldb:get(Db, "foo"), {error, not_found}, "Get k is not_found"),
+    ok = erleveldb:put(Db, "foo", "bar"),
+    {ok, <<"bar">>} = erleveldb:get(Db, "foo"),
+    ok = erleveldb:del(Db, "foo"),
+    {error, not_found} = erleveldb:get(Db, "foo"),
     ok.
 
 test_del_missing(Db) ->
-    etap:is(erleveldb:del(Db, "foo"), ok, "Del missing is not an error."),
+    ok = erleveldb:del(Db, "foo"),
+    ok = erleveldb:del(Db, "foo"),
     ok.
 
 test_put_del_put_get(Db) ->
-    etap:is(erleveldb:put(Db, "foo", "bar"), ok, "Put k/v is ok."),
-    etap:is(erleveldb:del(Db, "foo"), ok, "Del k is ok."),
-    etap:is(erleveldb:put(Db, "foo", "baz"), ok, "Re-put k/v is ok."),
-    etap:is(erleveldb:get(Db, "foo"), {ok, <<"baz">>}, "Got new v ok."),
+    ok = erleveldb:put(Db, "foo", "bar"),
+    ok = erleveldb:del(Db, "foo"),
+    ok = erleveldb:put(Db, "foo", "baz"),
+    {ok, <<"baz">>} = erleveldb:get(Db, "foo"),
+    ok.
+
+test_get_opts(Db) ->
+    ok = erleveldb:put(Db, "foo", "baz"),
+    {ok, <<"baz">>} = erleveldb:get(Db, "foo", []),
+    {ok, <<"baz">>} = erleveldb:get(Db, "foo", [verify_checksums]),
+    {ok, <<"baz">>} = erleveldb:get(Db, "foo", [skip_cache]),
+    {ok, <<"baz">>} = erleveldb:get(Db, "foo", [verify_checksums, skip_cache]),
+    ok = is_badarg(catch erleveldb:get(Db, "foo", [2])),
+    ok = is_badarg(catch erleveldb:get(Db, "foo", [{foo,bar}])),
+    ok.
+
+is_badarg({'EXIT', {badarg, _}}) ->
     ok.
 
 test_many_updates(Db, 0) ->

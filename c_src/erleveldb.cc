@@ -19,6 +19,7 @@
 typedef struct {
     ErlNifResourceType*     db_res;
     ErlNifResourceType*     it_res;
+    ErlNifResourceType*     ss_res;
     ErlNifResourceType*     wb_res;
 } State;
 
@@ -32,6 +33,12 @@ typedef struct {
     DBRes*                  dbres;
     leveldb::Iterator*      iter;
 } IterRes;
+
+typedef struct {
+    ErlNifMutex*            lock;
+    DBRes*                  dbres;
+    leveldb::Snapshot*      snap;
+} SSRes;
 
 typedef struct {
     ErlNifEnv*              env;
@@ -53,21 +60,31 @@ void
 free_itres(ErlNifEnv* env, void* obj)
 {
     IterRes* res = (IterRes*) obj;
-    enif_release_resource(res->dbres);
     if(res->iter != NULL) {
         delete res->iter;
     }
+    enif_release_resource(res->dbres);
+}
+
+void
+free_ssres(ErlNifEnv* env, void* obj)
+{
+    SSRes* res = (SSRes*) obj;
+    if(res->snap != NULL) {
+        res->dbres->db->ReleaseSnapshot(res->snap);
+    }
+    enif_release_resource(res->dbres);
 }
 
 void
 free_wbres(ErlNifEnv* env, void* obj)
 {
     WBRes* res = (WBRes*) obj;
-    enif_free_env(res->env);
-    enif_release_resource(res->dbres);
     if(res->batch != NULL) {
         delete res->batch;
     }
+    enif_release_resource(res->dbres);
+    enif_free_env(res->env);
 }
 
 static inline ERL_NIF_TERM
@@ -174,11 +191,56 @@ set_db_opts(ErlNifEnv* env, ERL_NIF_TERM optlist, leveldb::Options& opts)
             opts.block_restart_interval = bri;
             continue;
         }
+        
+        return 0;
     }
     
     return 1;
 }
 
+static inline int
+set_read_opts(ErlNifEnv* env, ERL_NIF_TERM optlist, leveldb::ReadOptions& opts)
+{
+    State* st = (State*) enif_priv_data(env);
+    SSRes* res;
+    ERL_NIF_TERM head;
+    ERL_NIF_TERM tail = optlist;
+    const ERL_NIF_TERM* tuple;
+    int arity;
+    
+    if(!enif_is_list(env, optlist)) {
+        return 0;
+    }
+    
+    while(enif_get_list_cell(env, tail, &head, &tail)) {
+        if(ENIF_IS(head, make_atom(env, "verify_checksums"))) {
+            opts.verify_checksums = true;
+            continue;
+        }
+        
+        if(ENIF_IS(head, make_atom(env, "skip_cache"))) {
+            opts.fill_cache = false;
+            continue;
+        }
+        
+        if(!enif_get_tuple(env, head, &arity, &tuple)) {
+            return 0;
+        }
+        
+        if(arity != 2) return 0;
+        
+        if(ENIF_IS(head, make_atom(env, "snapshot"))) {
+            if(!enif_get_resource(env, tuple[1], st->ss_res, (void**) &res)) {
+                return 0;
+            }
+            opts.snapshot = res->snap;
+        }
+
+        return 0;
+    }
+
+    return 1;
+}
 
 BEGIN_C
 
@@ -189,9 +251,9 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     const char* mod = "erleveldb";
     const char* db_name = "DBResource";
     const char* it_name = "IteratorResource";
+    const char* ss_name = "SnapshotResource";
     const char* wb_name = "WBResource";
     int flags = ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER;
-    ErlNifResourceType* res;
 
     if(st == NULL) {
         return -1;
@@ -199,21 +261,28 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     
     st->db_res = enif_open_resource_type(env, mod, db_name, free_dbres, 
                                         (ErlNifResourceFlags) flags, NULL);
-    if(res == NULL) {
+    if(st->db_res == NULL) {
         enif_free(st);
         return -1;
     }
     
     st->it_res = enif_open_resource_type(env, mod, it_name, free_itres,
                                         (ErlNifResourceFlags) flags, NULL);
-    if(res == NULL) {
+    if(st->it_res == NULL) {
+        enif_free(st);
+        return -1;
+    }
+    
+    st->ss_res = enif_open_resource_type(env, mod, ss_name, free_ssres,
+                                        (ErlNifResourceFlags) flags, NULL);
+    if(st->ss_res == NULL) {
         enif_free(st);
         return -1;
     }
     
     st->wb_res = enif_open_resource_type(env, mod, wb_name, free_wbres,
                                         (ErlNifResourceFlags) flags, NULL);
-    if(res == NULL) {
+    if(st->wb_res == NULL) {
         enif_free(st);
         return -1;
     }
@@ -245,23 +314,21 @@ static ERL_NIF_TERM
 open_db(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     State* st = (State*) enif_priv_data(env);
-
     ErlNifBinary bin;
+    leveldb::Options opts;
+
     if(!enif_inspect_iolist_as_binary(env, argv[0], &bin)) {
         return enif_make_badarg(env);
+    } else if(argc == 2 && !set_db_opts(env, argv[1], opts)) {
+        return enif_make_badarg(env);
     }
+
     std::string dbname((const char*) bin.data, bin.size);
     
     DBRes* res = (DBRes*) enif_alloc_resource(st->db_res, sizeof(DBRes));
     res->lock = NULL;
     res->db = NULL;
 
-    leveldb::Options opts;
-    if(!set_db_opts(env, argv[1], opts)) {
-        enif_release_resource(res);
-        return enif_make_badarg(env);
-    }
- 
     leveldb::Status status = leveldb::DB::Open(opts, dbname, &(res->db));
     if(!status.ok()) {
         enif_release_resource(res);
@@ -307,17 +374,20 @@ dbget(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     State* st = (State*) enif_priv_data(env);
     DBRes* res;
     ErlNifBinary key;
+    leveldb::ReadOptions opts;
     
     if(!enif_get_resource(env, argv[0], st->db_res, (void**) &res)) {
         return enif_make_badarg(env);
     } else if(!enif_inspect_iolist_as_binary(env, argv[1], &key)) {
+        return enif_make_badarg(env);
+    } else if(argc == 3 && !set_read_opts(env, argv[2], opts)) {
         return enif_make_badarg(env);
     }
     
     leveldb::Slice skey((const char*) key.data, key.size);
     
     std::string val;
-    leveldb::Status s = res->db->Get(leveldb::ReadOptions(), skey, &val);
+    leveldb::Status s = res->db->Get(opts, skey, &val);
     if(s.ok()) {
         ERL_NIF_TERM ret;
         unsigned char* buf = enif_make_new_binary(env, val.size(), &ret);
@@ -600,9 +670,11 @@ wbwrite(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
 static ErlNifFunc funcs[] =
 {
+    {"open_db", 1, open_db},
     {"open_db", 2, open_db},
     {"put", 3, dbput},
     {"get", 2, dbget},
+    {"get", 3, dbget},
     {"del", 2, dbdel},
     {"iter", 1, dbiter},
     {"seek", 2, itseek},
