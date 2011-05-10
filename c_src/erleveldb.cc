@@ -135,8 +135,8 @@ open_db(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     if(!enif_inspect_iolist_as_binary(env, argv[0], &bin)) {
         return enif_make_badarg(env);
     }
-    const char* dbname = (const char*) bin.data;
-
+    std::string dbname((const char*) bin.data, bin.size);
+    
     DBRes* res = (DBRes*) enif_alloc_resource(st->db_res, sizeof(DBRes));
     res->lock = NULL;
     res->db = NULL;
