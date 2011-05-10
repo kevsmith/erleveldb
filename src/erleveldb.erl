@@ -4,6 +4,7 @@
 
 -export([open_db/1]).
 -export([put/3, get/2, del/2]).
+-export([iter/1, seek/2, next/1, prev/1]).
 
 open_db(_Name) ->
     ?NOT_LOADED.
@@ -15,6 +16,18 @@ get(_Db, _Key) ->
     ?NOT_LOADED.
 
 del(_Db, _Key) ->
+    ?NOT_LOADED.
+
+iter(_Db) ->
+    ?NOT_LOADED.
+
+seek(_Iter, Key) ->
+    ?NOT_LOADED.
+
+next(_Iter) ->
+    ?NOT_LOADED.
+    
+prev(_Iter) ->
     ?NOT_LOADED.
 
 init() ->
