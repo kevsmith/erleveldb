@@ -9,7 +9,7 @@ main(_) ->
     %timer:sleep(5000),
     etap:plan(4),
     os:cmd("rm -rf " ++ dbname()),
-    {ok, Db} = erleveldb:open_db(dbname()),
+    {ok, Db} = erleveldb:open_db(dbname(), [create_if_missing]),
     etap:is(test_simple_write(Db), ok, "Simple write batch is ok."),
     etap:is(test_add_rem(Db), ok, "Can add and remove keys in one batch."),
     etap:is(test_add_rem_same(Db), ok, "Can add and remove same key in batch."),

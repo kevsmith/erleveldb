@@ -8,7 +8,7 @@ main(_) ->
     code:add_pathz("ebin"),
     etap:plan(4),
     os:cmd("rm -rf " ++ dbname()),
-    {ok, Db} = erleveldb:open_db(dbname()),
+    {ok, Db} = erleveldb:open_db(dbname(), [create_if_missing]),
     etap:is(test_write_kvs(Db, num_writes()), ok, "Wrote k/v pairs."),
     etap:is(test_seek_forward(Db), ok, "Seeked forward."),
     etap:is(test_seek_reverse(Db), ok, "Seeked reverse."),

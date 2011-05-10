@@ -1,7 +1,9 @@
 #include "erl_nif.h"
 #include "erl_nif_compat.h"
 
+#include "leveldb/cache.h"
 #include "leveldb/db.h"
+#include "leveldb/options.h"
 #include "leveldb/write_batch.h"
 
 #ifdef __cplusplus
@@ -11,6 +13,8 @@
 #define BEGIN_C
 #define END_C
 #endif
+
+#define ENIF_IS(a, b) (enif_compare(a, b) == 0)
 
 typedef struct {
     ErlNifResourceType*     db_res;
@@ -90,6 +94,92 @@ make_error(ErlNifEnv* env, const char* mesg)
     return enif_make_tuple2(env, error, make_atom(env, mesg));
 }
 
+static int
+set_db_opts(ErlNifEnv* env, ERL_NIF_TERM optlist, leveldb::Options& opts)
+{
+    ERL_NIF_TERM head;
+    ERL_NIF_TERM tail = optlist;
+    const ERL_NIF_TERM* tuple;
+    int arity;
+    
+    if(!enif_is_list(env, optlist)) {
+        return 0;
+    }
+    
+    while(enif_get_list_cell(env, tail, &head, &tail)) {
+        if(ENIF_IS(head, make_atom(env, "create_if_missing"))) {
+            if(opts.error_if_exists) return 0;
+            opts.create_if_missing = true;
+            continue;
+        }
+        
+        if(ENIF_IS(head, make_atom(env, "error_if_exists"))) {
+            if(opts.create_if_missing) return 0;
+            opts.error_if_exists = true;
+            continue;
+        }
+        
+        if(ENIF_IS(head, make_atom(env, "paranoid_checks"))) {
+            opts.paranoid_checks = true;
+            continue;
+        }
+        
+        if(!enif_get_tuple(env, head, &arity, &tuple)) {
+            return 0;
+        }
+        
+        if(arity != 2) return 0;
+        
+        if(ENIF_IS(tuple[0], make_atom(env, "write_buffer_size"))) {
+            unsigned int sz;
+            if(!enif_get_uint(env, tuple[1], (unsigned int*) &sz)) {
+                return 0;
+            }
+            opts.write_buffer_size = (size_t) sz;
+            continue;
+        }
+        
+        if(ENIF_IS(tuple[0], make_atom(env, "max_open_files"))) {
+            int num;
+            if(!enif_get_int(env, tuple[1], &num)) {
+                return 0;
+            }
+            opts.max_open_files = (size_t) num;
+            continue;
+        }
+        
+        if(ENIF_IS(tuple[0], make_atom(env, "cache_size"))) {
+            unsigned int sz;
+            if(!enif_get_uint(env, tuple[1], &sz)) {
+                return 0;
+            }
+            opts.block_cache = leveldb::NewLRUCache((size_t) sz);
+            continue;
+        }
+        
+        if(ENIF_IS(tuple[0], make_atom(env, "block_size"))) {
+            unsigned int sz;
+            if(!enif_get_uint(env, tuple[1], &sz)) {
+                return 0;
+            }
+            opts.block_size = (size_t) sz;
+            continue;
+        }
+        
+        if(ENIF_IS(tuple[0], make_atom(env, "block_restart_interval"))) {
+            int bri;
+            if(!enif_get_int(env, tuple[1], &bri)) {
+                return 0;
+            }
+            opts.block_restart_interval = bri;
+            continue;
+        }
+    }
+    
+    return 1;
+}
+
+
 BEGIN_C
 
 static int
@@ -167,7 +257,10 @@ open_db(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     res->db = NULL;
 
     leveldb::Options opts;
-    opts.create_if_missing = true;
+    if(!set_db_opts(env, argv[1], opts)) {
+        enif_release_resource(res);
+        return enif_make_badarg(env);
+    }
  
     leveldb::Status status = leveldb::DB::Open(opts, dbname, &(res->db));
     if(!status.ok()) {
@@ -321,14 +414,14 @@ itseek(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
     
-    if(enif_compare(argv[1], make_atom(env, "first")) == 0) {
+    if(ENIF_IS(argv[1], make_atom(env, "first"))) {
         res->iter->SeekToFirst();
         if(res->iter->Valid()) {
             return itvalue(env, res);
         } else {
             return make_atom(env, "not_found");
         }
-    } else if(enif_compare(argv[1], make_atom(env, "last")) == 0) {
+    } else if(ENIF_IS(argv[1], make_atom(env, "last"))) {
         res->iter->SeekToLast();
         if(res->iter->Valid()) {
             return itvalue(env, res);
@@ -507,7 +600,7 @@ wbwrite(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 
 static ErlNifFunc funcs[] =
 {
-    {"open_db", 1, open_db},
+    {"open_db", 2, open_db},
     {"put", 3, dbput},
     {"get", 2, dbget},
     {"del", 2, dbdel},

@@ -8,7 +8,7 @@ main(_) ->
     code:add_pathz("ebin"),
     etap:plan(11),
     os:cmd("rm -rf " ++ dbname()),
-    {ok, Db} = erleveldb:open_db(dbname()),
+    {ok, Db} = erleveldb:open_db(dbname(), [create_if_missing]),
     ok = test_get_missing(Db),
     ok = test_put_get_del(Db),
     ok = test_put_del_put_get(Db),
