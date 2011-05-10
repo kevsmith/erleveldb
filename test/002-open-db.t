@@ -1,6 +1,6 @@
 #!/usr/bin/env escript
 
-dbname() -> "foo_testdb".
+dbname() -> "test/dbs/002".
 
 main(_) ->
     code:add_pathz("test"),
