@@ -227,11 +227,12 @@ set_read_opts(ErlNifEnv* env, ERL_NIF_TERM list, leveldb::ReadOptions& opts)
         
         if(arity != 2) return 0;
         
-        if(ENIF_IS(head, make_atom(env, "snapshot"))) {
+        if(ENIF_IS(tuple[0], make_atom(env, "snapshot"))) {
             if(!enif_get_resource(env, tuple[1], st->ss_res, (void**) &res)) {
                 return 0;
             }
             opts.snapshot = res->snap;
+            continue;
         }
 
         return 0;
@@ -242,7 +243,7 @@ set_read_opts(ErlNifEnv* env, ERL_NIF_TERM list, leveldb::ReadOptions& opts)
 
 static inline int
 set_write_opts(ErlNifEnv* env, ERL_NIF_TERM list,
-                    leveldb::WriteOptions& opts, const leveldb::Snapshot* snap)
+                leveldb::WriteOptions& opts, const leveldb::Snapshot** snap)
 {
     ERL_NIF_TERM head;
     
@@ -257,7 +258,7 @@ set_write_opts(ErlNifEnv* env, ERL_NIF_TERM list,
         }
 
         if(ENIF_IS(head, make_atom(env, "snapshot"))) {
-            opts.post_write_snapshot = &snap;
+            opts.post_write_snapshot = snap;
             continue;
         }
 
@@ -398,7 +399,7 @@ dbput(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     } else if(!enif_inspect_iolist_as_binary(env, argv[2], &val)) {
         return enif_make_badarg(env);
-    } else if(argc == 4 && !set_write_opts(env, argv[3], opts, snap)) {
+    } else if(argc == 4 && !set_write_opts(env, argv[3], opts, &snap)) {
         return enif_make_badarg(env);
     }
     
@@ -463,7 +464,7 @@ dbdel(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     } else if(!enif_inspect_iolist_as_binary(env, argv[1], &key)) {
         return enif_make_badarg(env);
-    } else if(argc == 3 && !set_write_opts(env, argv[2], opts, snap)) {
+    } else if(argc == 3 && !set_write_opts(env, argv[2], opts, &snap)) {
         return enif_make_badarg(env);
     }
     
@@ -485,8 +486,14 @@ dbdel(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 static ERL_NIF_TERM
 dbsnap(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-    assert(0 == 1);
-    return argv[0];
+    State* st = (State*) enif_priv_data(env);
+    DBRes* res;
+    
+    if(!enif_get_resource(env, argv[0], st->db_res, (void**) &res)) {
+        return enif_make_badarg(env);
+    }
+    
+    return mk_snapshot(env, res, res->db->GetSnapshot());
 }
 
 static ERL_NIF_TERM
@@ -725,7 +732,7 @@ wbwrite(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     } else if(res->batch == NULL) {
         return enif_make_badarg(env);
-    } else if(argc == 2 && !set_write_opts(env, argv[1], opts, snap)) {
+    } else if(argc == 2 && !set_write_opts(env, argv[1], opts, &snap)) {
         return enif_make_badarg(env);
     }
 
@@ -756,6 +763,8 @@ static ErlNifFunc funcs[] =
     {"get", 3, dbget},
     {"del", 2, dbdel},
     {"del", 3, dbdel},
+    
+    {"snapshot", 1, dbsnap},
     
     {"iter", 1, dbiter},
     {"iter", 2, dbiter},

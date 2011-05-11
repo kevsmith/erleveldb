@@ -8,6 +8,7 @@
 -export([put/3, put/4, get/2, get/3, del/2, del/3]).
 -export([iter/1, iter/2, seek/2, next/1, prev/1]).
 -export([batch/1, wb_put/3, wb_del/2, wb_clear/1, wb_write/1, wb_write/2]).
+-export([snapshot/1]).
 
 
 open_db(_Name) ->
@@ -74,6 +75,9 @@ wb_write(_Wb) ->
 wb_write(_Wb, _Opts) ->
     ?NOT_LOADED.
 
+
+snapshot(_Db) ->
+    ?NOT_LOADED.
 
 % Internal API
 
