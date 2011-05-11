@@ -3,16 +3,19 @@
 -define(NOT_LOADED, not_loaded(?LINE)).
 -define(i2b(B), iolist_to_binary(B)).
 
+
 -export([open_db/1, open_db/2]).
 -export([put/3, put/4, get/2, get/3, del/2, del/3]).
 -export([iter/1, iter/2, seek/2, next/1, prev/1]).
 -export([batch/1, wb_put/3, wb_del/2, wb_clear/1, wb_write/1, wb_write/2]).
+
 
 open_db(_Name) ->
     ?NOT_LOADED.
 
 open_db(_Name, _Opts) ->
     ?NOT_LOADED.
+
 
 put(_Db, _Key, _Value) ->
     ?NOT_LOADED.
@@ -71,6 +74,10 @@ wb_write(_Wb) ->
 wb_write(_Wb, _Opts) ->
     ?NOT_LOADED.
 
+
+% Internal API
+
+
 wb_put0(_Wb, _Key, _Val) ->
     ?NOT_LOADED.
 
@@ -91,6 +98,7 @@ init() ->
             filename:join(Dir, ?MODULE)
     end,
     erlang:load_nif(SoName, 0).
+
 
 not_loaded(Line) ->
     exit({not_loaded, [{module, ?MODULE}, {line, Line}]}).
