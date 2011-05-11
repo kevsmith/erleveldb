@@ -17,34 +17,34 @@
 #define ENIF_IS(a, b) (enif_compare(a, b) == 0)
 
 typedef struct {
-    ErlNifResourceType*     db_res;
-    ErlNifResourceType*     it_res;
-    ErlNifResourceType*     ss_res;
-    ErlNifResourceType*     wb_res;
+    ErlNifResourceType*         db_res;
+    ErlNifResourceType*         it_res;
+    ErlNifResourceType*         ss_res;
+    ErlNifResourceType*         wb_res;
 } State;
 
 typedef struct {
-    ErlNifMutex*            lock;
-    leveldb::DB*            db;
+    ErlNifMutex*                lock;
+    leveldb::DB*                db;
 } DBRes;
 
 typedef struct {
-    ErlNifMutex*            lock;
-    DBRes*                  dbres;
-    leveldb::Iterator*      iter;
+    ErlNifMutex*                lock;
+    DBRes*                      dbres;
+    leveldb::Iterator*          iter;
 } IterRes;
 
 typedef struct {
-    ErlNifMutex*            lock;
-    DBRes*                  dbres;
-    leveldb::Snapshot*      snap;
+    ErlNifMutex*                lock;
+    DBRes*                      dbres;
+    const leveldb::Snapshot*    snap;
 } SSRes;
 
 typedef struct {
-    ErlNifEnv*              env;
-    ErlNifMutex*            lock;
-    DBRes*                  dbres;
-    leveldb::WriteBatch*    batch;
+    ErlNifEnv*                  env;
+    ErlNifMutex*                lock;
+    DBRes*                      dbres;
+    leveldb::WriteBatch*        batch;
 } WBRes;
 
 void
@@ -112,18 +112,17 @@ make_error(ErlNifEnv* env, const char* mesg)
 }
 
 static int
-set_db_opts(ErlNifEnv* env, ERL_NIF_TERM optlist, leveldb::Options& opts)
+set_db_opts(ErlNifEnv* env, ERL_NIF_TERM list, leveldb::Options& opts)
 {
     ERL_NIF_TERM head;
-    ERL_NIF_TERM tail = optlist;
     const ERL_NIF_TERM* tuple;
     int arity;
     
-    if(!enif_is_list(env, optlist)) {
+    if(!enif_is_list(env, list)) {
         return 0;
     }
     
-    while(enif_get_list_cell(env, tail, &head, &tail)) {
+    while(enif_get_list_cell(env, list, &head, &list)) {
         if(ENIF_IS(head, make_atom(env, "create_if_missing"))) {
             if(opts.error_if_exists) return 0;
             opts.create_if_missing = true;
@@ -199,20 +198,19 @@ set_db_opts(ErlNifEnv* env, ERL_NIF_TERM optlist, leveldb::Options& opts)
 }
 
 static inline int
-set_read_opts(ErlNifEnv* env, ERL_NIF_TERM optlist, leveldb::ReadOptions& opts)
+set_read_opts(ErlNifEnv* env, ERL_NIF_TERM list, leveldb::ReadOptions& opts)
 {
     State* st = (State*) enif_priv_data(env);
     SSRes* res;
     ERL_NIF_TERM head;
-    ERL_NIF_TERM tail = optlist;
     const ERL_NIF_TERM* tuple;
     int arity;
     
-    if(!enif_is_list(env, optlist)) {
+    if(!enif_is_list(env, list)) {
         return 0;
     }
     
-    while(enif_get_list_cell(env, tail, &head, &tail)) {
+    while(enif_get_list_cell(env, list, &head, &list)) {
         if(ENIF_IS(head, make_atom(env, "verify_checksums"))) {
             opts.verify_checksums = true;
             continue;
@@ -240,6 +238,49 @@ set_read_opts(ErlNifEnv* env, ERL_NIF_TERM optlist, leveldb::ReadOptions& opts)
     }
 
     return 1;
+}
+
+static inline int
+set_write_opts(ErlNifEnv* env, ERL_NIF_TERM list,
+                    leveldb::WriteOptions& opts, const leveldb::Snapshot* snap)
+{
+    ERL_NIF_TERM head;
+    
+    if(!enif_is_list(env, list)) {
+        return 0;
+    }
+    
+    while(enif_get_list_cell(env, list, &head, &list)) {
+        if(ENIF_IS(head, make_atom(env, "sync"))) {
+            opts.sync = true;
+            continue;
+        }
+
+        if(ENIF_IS(head, make_atom(env, "snapshot"))) {
+            opts.post_write_snapshot = &snap;
+            continue;
+        }
+
+        return 0;
+    }
+
+    return 1;
+}
+
+static inline ERL_NIF_TERM
+mk_snapshot(ErlNifEnv* env, DBRes* dbres, const leveldb::Snapshot* snap)
+{
+    State* st = (State*) enif_priv_data(env);
+    SSRes* ssres = (SSRes*) enif_alloc_resource(st->ss_res, sizeof(SSRes));
+    ssres->lock = NULL;
+    ssres->dbres = dbres;
+    enif_keep_resource(ssres->dbres);
+    ssres->snap = snap;
+
+    ERL_NIF_TERM ret = enif_make_resource(env, ssres);
+    enif_release_resource(ssres);
+
+    return make_ok(env, ret);    
 }
 
 BEGIN_C
@@ -348,6 +389,8 @@ dbput(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     DBRes* res;
     ErlNifBinary key;
     ErlNifBinary val;
+    leveldb::WriteOptions opts;
+    const leveldb::Snapshot* snap = NULL;
     
     if(!enif_get_resource(env, argv[0], st->db_res, (void**) &res)) {
         return enif_make_badarg(env);
@@ -355,15 +398,22 @@ dbput(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     } else if(!enif_inspect_iolist_as_binary(env, argv[2], &val)) {
         return enif_make_badarg(env);
+    } else if(argc == 4 && !set_write_opts(env, argv[3], opts, snap)) {
+        return enif_make_badarg(env);
     }
     
     leveldb::Slice skey((const char*) key.data, key.size);
     leveldb::Slice sval((const char*) val.data, val.size);
     
-    leveldb::Status s = res->db->Put(leveldb::WriteOptions(), skey, sval);
+    leveldb::Status s = res->db->Put(opts, skey, sval);
     if(s.ok()) {
-        return make_atom(env, "ok");
+        if(snap != NULL) {
+            return mk_snapshot(env, res, snap);
+        } else {
+            return make_atom(env, "ok");
+        }
     } else {
+        if(snap != NULL) res->db->ReleaseSnapshot(snap);
         return make_error(env, "unknown");
     }
 }
@@ -387,7 +437,7 @@ dbget(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     leveldb::Slice skey((const char*) key.data, key.size);
     
     std::string val;
-    leveldb::Status s = res->db->Get(opts, skey, &val);
+    leveldb::Status s = res->db->Get(opts, skey, &val);    
     if(s.ok()) {
         ERL_NIF_TERM ret;
         unsigned char* buf = enif_make_new_binary(env, val.size(), &ret);
@@ -406,21 +456,37 @@ dbdel(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     State* st = (State*) enif_priv_data(env);
     DBRes* res;
     ErlNifBinary key;
+    leveldb::WriteOptions opts;
+    const leveldb::Snapshot* snap = NULL;
     
     if(!enif_get_resource(env, argv[0], st->db_res, (void**) &res)) {
         return enif_make_badarg(env);
     } else if(!enif_inspect_iolist_as_binary(env, argv[1], &key)) {
         return enif_make_badarg(env);
+    } else if(argc == 3 && !set_write_opts(env, argv[2], opts, snap)) {
+        return enif_make_badarg(env);
     }
     
     leveldb::Slice skey((const char*) key.data, key.size);
     
-    leveldb::Status s = res->db->Delete(leveldb::WriteOptions(), skey);
+    leveldb::Status s = res->db->Delete(opts, skey);
     if(s.ok()) {
-        return make_atom(env, "ok");
+        if(snap != NULL) {
+            return mk_snapshot(env, res, snap);
+        } else {
+            return make_atom(env, "ok");
+        }
     } else {
-        return make_error(env, "unknown");
+        if(snap != NULL) res->db->ReleaseSnapshot(snap);
+        return make_error(env, "unknwon");
     }
+}
+
+static ERL_NIF_TERM
+dbsnap(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+    assert(0 == 1);
+    return argv[0];
 }
 
 static ERL_NIF_TERM
@@ -428,8 +494,11 @@ dbiter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     State* st = (State*) enif_priv_data(env);
     DBRes* dbres;
+    leveldb::ReadOptions opts;
     
     if(!enif_get_resource(env, argv[0], st->db_res, (void**) &dbres)) {
+        return enif_make_badarg(env);
+    } else if(argc == 2 && !set_read_opts(env, argv[1], opts)) {
         return enif_make_badarg(env);
     }
     
@@ -438,7 +507,7 @@ dbiter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     res->dbres = dbres;
     enif_keep_resource(dbres);
 
-    res->iter = dbres->db->NewIterator(leveldb::ReadOptions());
+    res->iter = dbres->db->NewIterator(opts);
     if(res->iter == NULL) {
         enif_release_resource(res);
         return make_error(env, "iterator_init_failed");
@@ -649,21 +718,29 @@ wbwrite(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     State* st = (State*) enif_priv_data(env);
     WBRes* res;
-    
+    leveldb::WriteOptions opts;
+    const leveldb::Snapshot* snap = NULL;
+
     if(!enif_get_resource(env, argv[0], st->wb_res, (void**) &res)) {
         return enif_make_badarg(env);
     } else if(res->batch == NULL) {
         return enif_make_badarg(env);
+    } else if(argc == 2 && !set_write_opts(env, argv[1], opts, snap)) {
+        return enif_make_badarg(env);
     }
 
-    leveldb::WriteOptions opts;
     leveldb::Status s = res->dbres->db->Write(opts, res->batch);
     delete res->batch;
     res->batch = NULL;
 
     if(s.ok()) {
-        return make_atom(env, "ok");
+        if(snap != NULL) {
+            return mk_snapshot(env, res->dbres, snap);
+        } else {
+            return make_atom(env, "ok");
+        }
     } else {
+        if(snap != NULL) res->dbres->db->ReleaseSnapshot(snap);
         return make_error(env, "unknown");
     }
 }
@@ -673,10 +750,13 @@ static ErlNifFunc funcs[] =
     {"open_db", 1, open_db},
     {"open_db", 2, open_db},
     {"put", 3, dbput},
+    {"put", 4, dbput},
     {"get", 2, dbget},
     {"get", 3, dbget},
     {"del", 2, dbdel},
+    {"del", 3, dbdel},
     {"iter", 1, dbiter},
+    {"iter", 2, dbiter},
     {"seek", 2, itseek},
     {"next", 1, itnext},
     {"prev", 1, itprev},
@@ -684,7 +764,8 @@ static ErlNifFunc funcs[] =
     {"wb_put0", 3, wbput},
     {"wb_del0", 2, wbdel},
     {"wb_clear", 1, wbclear},
-    {"wb_write", 1, wbwrite}
+    {"wb_write", 1, wbwrite},
+    {"wb_write", 2, wbwrite}
 };
 
 ERL_NIF_INIT(erleveldb, funcs, &load, &reload, &upgrade, &unload);
