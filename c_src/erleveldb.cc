@@ -14,6 +14,8 @@
 #define END_C
 #endif
 
+#define ENIF_RF ErlNifResourceFlags
+#define ENIF_ORT enif_open_resource_type
 #define ENIF_IS(a, b) (enif_compare(a, b) == 0)
 
 typedef struct {
@@ -295,35 +297,31 @@ load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
     const char* it_name = "IteratorResource";
     const char* ss_name = "SnapshotResource";
     const char* wb_name = "WBResource";
-    int flags = ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER;
+    ENIF_RF flags = (ENIF_RF) (ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER);
 
     if(st == NULL) {
         return -1;
     }
     
-    st->db_res = enif_open_resource_type(env, mod, db_name, free_dbres, 
-                                        (ErlNifResourceFlags) flags, NULL);
+    st->db_res = ENIF_ORT(env, mod, db_name, free_dbres, flags, NULL);
     if(st->db_res == NULL) {
         enif_free(st);
         return -1;
     }
-    
-    st->it_res = enif_open_resource_type(env, mod, it_name, free_itres,
-                                        (ErlNifResourceFlags) flags, NULL);
+
+    st->it_res = ENIF_ORT(env, mod, it_name, free_itres, flags, NULL);
     if(st->it_res == NULL) {
         enif_free(st);
         return -1;
     }
     
-    st->ss_res = enif_open_resource_type(env, mod, ss_name, free_ssres,
-                                        (ErlNifResourceFlags) flags, NULL);
+    st->ss_res = ENIF_ORT(env, mod, ss_name, free_ssres, flags, NULL);
     if(st->ss_res == NULL) {
         enif_free(st);
         return -1;
     }
-    
-    st->wb_res = enif_open_resource_type(env, mod, wb_name, free_wbres,
-                                        (ErlNifResourceFlags) flags, NULL);
+
+    st->wb_res = ENIF_ORT(env, mod, wb_name, free_wbres, flags, NULL);
     if(st->wb_res == NULL) {
         enif_free(st);
         return -1;
