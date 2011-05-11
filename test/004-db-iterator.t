@@ -30,6 +30,7 @@ test_seek_forward(Db) ->
         Next = {to_key(N), to_key(N)},
         Next = erleveldb:next(Iter)
     end, lists:seq(2, num_writes())),
+    not_found = erleveldb:next(Iter),
     ok.
 
 test_seek_reverse(Db) ->
@@ -39,6 +40,7 @@ test_seek_reverse(Db) ->
         Next = {to_key(N), to_key(N)},
         Next = erleveldb:prev(Iter)
     end, lists:seq(num_writes()-1, 1, -1)),
+    not_found = erleveldb:prev(Iter),
     ok.
 
 test_seek_key(Db) ->
