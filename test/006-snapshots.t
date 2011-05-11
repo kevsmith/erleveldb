@@ -6,7 +6,7 @@ main(_) ->
     code:add_pathz("test"),
     code:add_pathz("ebin"),
 
-    etap:plan(unknown),
+    etap:plan(6),
     os:cmd("rm -rf " ++ dbname()),
     {ok, Db} = erleveldb:open_db(dbname(), [create_if_missing]),
     etap:is(test_basic_snapshot(Db), ok, "Basic snapshots work."),
