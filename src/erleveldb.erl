@@ -32,7 +32,7 @@ get(_Db, _Key, _Opts) ->
 
 del(_Db, _Key) ->
     ?NOT_LOADED.
-    
+
 del(_Db, _Key, _Opts) ->
     ?NOT_LOADED.
 
@@ -48,7 +48,7 @@ seek(_Iter, _Key) ->
 
 next(_Iter) ->
     ?NOT_LOADED.
-    
+
 prev(_Iter) ->
     ?NOT_LOADED.
 
