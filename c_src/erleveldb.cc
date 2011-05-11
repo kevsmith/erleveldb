@@ -749,17 +749,20 @@ static ErlNifFunc funcs[] =
 {
     {"open_db", 1, open_db},
     {"open_db", 2, open_db},
+    
     {"put", 3, dbput},
     {"put", 4, dbput},
     {"get", 2, dbget},
     {"get", 3, dbget},
     {"del", 2, dbdel},
     {"del", 3, dbdel},
+    
     {"iter", 1, dbiter},
     {"iter", 2, dbiter},
     {"seek", 2, itseek},
     {"next", 1, itnext},
     {"prev", 1, itprev},
+    
     {"batch", 1, dbbatch},
     {"wb_put0", 3, wbput},
     {"wb_del0", 2, wbdel},
