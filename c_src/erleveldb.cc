@@ -1,3 +1,5 @@
+#include <assert.h>
+
 #include "erl_nif.h"
 #include "erl_nif_compat.h"
 
@@ -88,6 +90,24 @@ free_wbres(ErlNifEnv* env, void* obj)
     enif_release_resource(res->dbres);
     enif_free_env(res->env);
 }
+
+class MutexLock {
+    public:
+        MutexLock(ErlNifMutex* lock) {
+            assert(lock != NULL && "Invalid mutex for MutexLock.");
+            this->lock = lock;
+            enif_mutex_lock(this->lock);
+        }
+    
+        ~MutexLock() {
+            enif_mutex_unlock(this->lock);
+        }
+    
+    private:
+        MutexLock(const MutexLock& l) {}
+        void operator=(const MutexLock& l) {}
+        ErlNifMutex* lock;
+};
 
 static inline ERL_NIF_TERM
 make_atom(ErlNifEnv* env, const char* name)
@@ -508,7 +528,7 @@ dbiter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     }
     
     IterRes* res = (IterRes*) enif_alloc_resource(st->it_res, sizeof(IterRes));
-    res->lock = NULL;
+    res->lock = enif_mutex_create(NULL);
     res->dbres = dbres;
     enif_keep_resource(dbres);
 
@@ -558,6 +578,9 @@ itseek(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
     
+    // Lock iterator until end of function
+    MutexLock ml(res->lock);
+    
     if(ENIF_IS(argv[1], make_atom(env, "first"))) {
         res->iter->SeekToFirst();
         if(res->iter->Valid()) {
@@ -595,6 +618,9 @@ itnext(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
     
+    // Lock iterator until end of function
+    MutexLock ml(res->lock);
+    
     if(!res->iter->Valid()) {
         return make_atom(env, "not_found");
     }
@@ -612,6 +638,9 @@ itprev(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     if(!enif_get_resource(env, argv[0], st->it_res, (void**) &res)) {
         return enif_make_badarg(env);
     }
+    
+    // Lock iterator until end of function
+    MutexLock ml(res->lock);
     
     if(!res->iter->Valid()) {
         return make_atom(env, "not_found");
@@ -633,7 +662,7 @@ dbbatch(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     
     WBRes* res = (WBRes*) enif_alloc_resource(st->wb_res, sizeof(WBRes));
     res->env = enif_alloc_env();
-    res->lock = NULL;
+    res->lock = enif_mutex_create(NULL);
     res->dbres = dbres;
     enif_keep_resource(dbres);
 
@@ -663,6 +692,9 @@ wbput(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
     
+    // Lock batch to end of function.
+    MutexLock ml(res->lock);
+    
     ERL_NIF_TERM argv1 = enif_make_copy(res->env, argv[1]);
     ERL_NIF_TERM argv2 = enif_make_copy(res->env, argv[2]);
     
@@ -691,6 +723,8 @@ wbdel(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
     
+    MutexLock ml(res->lock);
+    
     ERL_NIF_TERM argv1 = enif_make_copy(res->env, argv[1]);
     
     if(!enif_inspect_binary(env, argv1, &key)) {
@@ -714,6 +748,8 @@ wbclear(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
     
+    MutexLock ml(res->lock);
+    
     res->batch->Clear();
     return make_atom(env, "ok");
 }
@@ -733,6 +769,8 @@ wbwrite(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     } else if(argc == 2 && !set_write_opts(env, argv[1], opts, &snap)) {
         return enif_make_badarg(env);
     }
+
+    MutexLock ml(res->lock);
 
     leveldb::Status s = res->dbres->db->Write(opts, res->batch);
     delete res->batch;
