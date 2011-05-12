@@ -109,14 +109,14 @@ optionally return an error if it already exists.
 
 ## Storing and Retrieving Data
 
-    erleveldb:get(db(), key()) -> {ok, result()} | error()
-    erleveldb:get(db(), key(), readopts()) -> {ok, result()} | error()
+    erleveldb:get(db(), ikey()) -> {ok, val()} | error()
+    erleveldb:get(db(), ikey(), readopts()) -> {ok, val()} | error()
     
-    erleveldb:put(db(), key(), val()) -> ok | error()
-    erleveldb:put(db(), key(), val(), writeopts()) -> ok | {ok, snapshot()} | error()
+    erleveldb:put(db(), ikey(), ival()) -> ok | error()
+    erleveldb:put(db(), ikey(), ival(), writeopts()) -> ok | {ok, val()} | error()
 
-    erleveldb:del(db(), key()) -> ok | error()
-    erleveldb:del(db(), key(), writeopts()) -> ok | {ok, snapshot()} | error()
+    erleveldb:del(db(), ikey()) -> ok | error()
+    erleveldb:del(db(), ikey(), writeopts()) -> ok | {ok, snapshot()} | error()
 
 These are pretty standard get/put/delete operations that you would expect
 for any key/value store. The one added bonus is the support for snapshots
@@ -148,8 +148,8 @@ iterators created from it are garbage collected.
 
     erleveldb:batch(db()) -> write_batch() | error()
     
-    erleveldb:wb_put(write_batch(), key(), val()) -> ok | error()
-    erleveldb:wb_del(write_batch(), key()) -> ok | error()
+    erleveldb:wb_put(write_batch(), ikey(), ival()) -> ok | error()
+    erleveldb:wb_del(write_batch(), ikey()) -> ok | error()
     
     erleveldb:wb_clear(write_batch()) -> ok | error()
     
