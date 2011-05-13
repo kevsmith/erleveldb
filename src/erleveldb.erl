@@ -70,7 +70,7 @@ iter(_Db) -> ?bin.
 iter(_Db, _Opts) -> ?bin.
 
 
--spec seek(iterator(), ikey()) -> {ok, {key(), val()}} | error().
+-spec seek(iterator(), seek_dest()) -> {ok, {key(), val()}} | error().
 seek(_Iter, _Key) -> ?kv.
 
 -spec next(iterator()) -> {ok, {key(), val()}} | error().
