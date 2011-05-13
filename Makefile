@@ -10,8 +10,6 @@ clean:
 erl_clean:
 	@rm -fv ebin/*
 
-
-
 check: build test/etap.beam
 	@if [ ! -e ~/.*dialyzer_plt ] ; \
 	then \
