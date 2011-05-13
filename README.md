@@ -7,41 +7,18 @@ it beyond asserting that the basic API works.
 
 # API
 
-This API description uses a faux spec language to describe the Erlang
-types associated with each function. I'm not entirely certain how they'd
-interact with NIF functions or how to generate API docs from Erlang
-modules just yet so I'm running with this for now. When I get time I'll
-clean things up.
+All types are formally defined in `erleveldb.hrl`.
 
 
-## Types used in this API
-
-## Opaque resource types
+## Opaque Resource Types
 
     db() -> term()
     iterator() -> term()
     write_batch() -> term()
     snapshot() -> term()
 
-## Argument and return types
-    
-    dbname() -> iolist()
-    dbopts() -> proplist()
 
-    ikey() -> iolist()
-    ival() -> iolist()
-    
-    key() -> binary()
-    val() -> binary()
-    
-    readopts() -> proplist()
-    writeopts() -> proplist()
-
-    seek_dest() -> key() | first | last
-    
-    error() -> {error, term()}
-
-### Type descriptions
+### Type Descriptions
 
 * `dbname()` will be used as the directory name that contains the database
   so you should consider filesystem constraints.
@@ -53,7 +30,8 @@ clean things up.
   `iolist()` erleveldb will always return values as simple `binary()`s.
 * `readopts()` control how individual read operations behave.
 * `writeopts()` control how individual write operations behave.
-* `seek_dest()` is used by the iterator to seek in key space.
+* `seek_dest()` is used by the iterator to seek in key space. This can be
+  an `ikey()` or one of the atoms `first` or `last`.
 
 
 ### Valid values for the `dbopts()` proplist
@@ -83,7 +61,7 @@ clean things up.
   request.
 * `skip_cache` Do not store data read into the block cache. This is
   mostly useful for bulk reads when you don't expect to reread the
-data quickly.
+  data quickly.
 * `{snapshot, Snapshot}` A database snapshot to read from. This will
   only return results that existed at a given state of the database.
 
@@ -99,8 +77,8 @@ data quickly.
 
 ## Opening a database
 
-    erleveldb:open_db(dbname()) -> {ok, db()} | error()
-    erleveldb:open_db(dbname(), dbopts()) -> {ok, db()} | error()
+    open_db(dbname()) -> {ok, db()} | error().
+    open_db(dbname(), dbopts()) -> {ok, db()} | error().
 
 This is pretty simple. By default `open_db/1,2` expect that the database
 already exists. You can use the `dbopts()` to create the database and
@@ -109,14 +87,14 @@ optionally return an error if it already exists.
 
 ## Storing and Retrieving Data
 
-    erleveldb:get(db(), ikey()) -> {ok, val()} | error()
-    erleveldb:get(db(), ikey(), readopts()) -> {ok, val()} | error()
-    
-    erleveldb:put(db(), ikey(), ival()) -> ok | error()
-    erleveldb:put(db(), ikey(), ival(), writeopts()) -> ok | {ok, val()} | error()
+    get(db(), ikey()) -> {ok, val()} | error().
+    get(db(), ikey(), readopts()) -> {ok, val()} | error().
 
-    erleveldb:del(db(), ikey()) -> ok | error()
-    erleveldb:del(db(), ikey(), writeopts()) -> ok | {ok, snapshot()} | error()
+    put(db(), ikey(), ival()) -> ok | error().
+    put(db(), ikey(), ival(), writeopts()) -> ok | {ok, val()} | error().
+
+    del(db(), ikey()) -> ok | error().
+    del(db(), ikey(), writeopts()) -> ok | {ok, snapshot()} | error().
 
 These are pretty standard get/put/delete operations that you would expect
 for any key/value store. The one added bonus is the support for snapshots
@@ -125,13 +103,12 @@ which is explained below.
 
 ## Database Iteration
 
-    erleveldb:iter(db()) -> iterator() | error()
-    erleveldb:iter(db(), readopts()) -> iteratar() | error()
+    iter(db()) -> {ok, iterator()} | error().
+    iter(db(), readopts()) -> {ok, iterator()} | error().
     
-    erleveldb:seek(db(), dest()) -> not_found | {key(), val()} | error()
-    
-    erleveldb:next(db()) -> not_found | {key(), val()} | error()
-    erleveldb:prev(db()) -> not_found | {key(), val()} | error()
+    seek(iterator(), seek_dest()) -> {ok, {key(), val()}} | error().
+    next(iterator()) -> {ok, {key(), val()}} | error().
+    prev(iterator()) -> {ok, {key(), val()}} | error().
     
 The values for readopts() are the same as above. This API is a bit wonky
 in so much as the `seek/2` returns the first key/value pair in the iterator.
@@ -146,15 +123,15 @@ iterators created from it are garbage collected.
 
 ## Batched updates
 
-    erleveldb:batch(db()) -> write_batch() | error()
-    
-    erleveldb:wb_put(write_batch(), ikey(), ival()) -> ok | error()
-    erleveldb:wb_del(write_batch(), ikey()) -> ok | error()
-    
-    erleveldb:wb_clear(write_batch()) -> ok | error()
-    
-    erleveldb:wb_write(write_batch()) -> ok | error()
-    erleveldb:wb_write(write_batch(), writeopts()) -> ok | {ok | snapshot()} | error()
+    batch(db()) -> {ok, write_batch()} | error().
+
+    wb_put(write_batch(), ikey(), ival()) -> ok | error().
+    wb_del(write_batch(), ikey()) -> ok | error().
+
+    wb_clear(write_batch()) -> ok | error().
+
+    wb_write(write_batch()) -> ok | error().
+    wb_write(write_batch(), writeopts()) -> ok | {ok, snapshot()} | error().
 
 Batched updates can be used to apply a series of put and delete operations
 against a database as an atomic unit. The order of put and delete operations
@@ -171,7 +148,7 @@ write batches created from it have been garbage collected.
 
 ## Snapshots
 
-    erleveldb:snapshot(db()) -> snapshot() | error()
+    snapshot(db()) -> {ok, snapshot()} | error().
     
 Snapshots are used to issue reads against a specific version of the
 database. They can be returned from the whatever the current version of
