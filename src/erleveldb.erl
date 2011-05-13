@@ -1,3 +1,6 @@
+%% This file is part of ErLevelDB released under the MIT license. 
+%% See the LICENSE file for more information.
+
 -module(erleveldb).
 -on_load(init/0).
 -define(NOT_LOADED, not_loaded(?LINE)).

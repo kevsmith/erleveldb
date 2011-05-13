@@ -1,4 +1,6 @@
 #!/usr/bin/env escript
+%% This file is part of ErLevelDB released under the MIT license. 
+%% See the LICENSE file for more information.
 
 dbname() -> "test/dbs/005".
 num_writes() -> 1000.
