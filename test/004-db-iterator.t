@@ -27,29 +27,29 @@ test_write_kvs(Db, N) ->
 
 test_seek_forward(Db) ->
     {ok, Iter} = erleveldb:iter(Db),
-    {<<"000001">>, <<"000001">>} = erleveldb:seek(Iter, first),
+    {ok, {<<"000001">>, <<"000001">>}} = erleveldb:seek(Iter, first),
     lists:foreach(fun(N) ->
         Next = {to_key(N), to_key(N)},
-        Next = erleveldb:next(Iter)
+        {ok, Next} = erleveldb:next(Iter)
     end, lists:seq(2, num_writes())),
-    not_found = erleveldb:next(Iter),
+    {error, not_found} = erleveldb:next(Iter),
     ok.
 
 test_seek_reverse(Db) ->
     {ok, Iter} = erleveldb:iter(Db),
-    {<<"001000">>, <<"001000">>} = erleveldb:seek(Iter, last),
+    {ok, {<<"001000">>, <<"001000">>}} = erleveldb:seek(Iter, last),
     lists:foreach(fun(N) ->
         Next = {to_key(N), to_key(N)},
-        Next = erleveldb:prev(Iter)
+        {ok, Next} = erleveldb:prev(Iter)
     end, lists:seq(num_writes()-1, 1, -1)),
-    not_found = erleveldb:prev(Iter),
+    {error, not_found} = erleveldb:prev(Iter),
     ok.
 
 test_seek_key(Db) ->
     {ok, Iter} = erleveldb:iter(Db),
     lists:foreach(fun(N) ->
         Next = {to_key(N), to_key(N)},
-        Next = erleveldb:seek(Iter, to_key(N))
+        {ok, Next} = erleveldb:seek(Iter, to_key(N))
     end, lists:seq(1, num_writes(), 5)),
     ok.
 

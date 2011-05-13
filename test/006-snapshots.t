@@ -48,19 +48,19 @@ test_iter_snapshot(Db) ->
     {ok, Iter1} = erleveldb:iter(Db, [{snapshot, Snap}]),
     ok = erleveldb:put(Db, "04", "04"),
     ok = erleveldb:put(Db, "05", "05"),
-    {<<"01">>, <<"01">>} = erleveldb:seek(Iter1, first),
-    {<<"02">>, <<"02">>} = erleveldb:next(Iter1),
-    {<<"03">>, <<"03">>} = erleveldb:next(Iter1),
-    {<<"02">>, <<"02">>} = erleveldb:prev(Iter1),
-    {<<"03">>, <<"03">>} = erleveldb:next(Iter1),
-    not_found = erleveldb:next(Iter1),
+    {ok, {<<"01">>, <<"01">>}} = erleveldb:seek(Iter1, first),
+    {ok, {<<"02">>, <<"02">>}} = erleveldb:next(Iter1),
+    {ok, {<<"03">>, <<"03">>}} = erleveldb:next(Iter1),
+    {ok, {<<"02">>, <<"02">>}} = erleveldb:prev(Iter1),
+    {ok, {<<"03">>, <<"03">>}} = erleveldb:next(Iter1),
+    {error, not_found} = erleveldb:next(Iter1),
     {ok, Iter2} = erleveldb:iter(Db),
-    {<<"01">>, <<"01">>} = erleveldb:seek(Iter2, first),
+    {ok, {<<"01">>, <<"01">>}} = erleveldb:seek(Iter2, first),
     lists:foreach(fun(N) ->
         Next = {to_key(N), to_key(N)},
-        Next = erleveldb:next(Iter2)
+        {ok, Next} = erleveldb:next(Iter2)
     end, lists:seq(2, 5)),
-    not_found = erleveldb:next(Iter2),
+    {error, not_found} = erleveldb:next(Iter2),
     ok.
 
 test_put_snapshot(Db) ->

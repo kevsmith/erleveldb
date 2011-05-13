@@ -6,10 +6,22 @@
 
 %% Database names and various options
 -type dbname() :: iolist().
--type dbopts() :: [create_if_missing | error_if_exists | paranoid_checks |
-                   {write_buffer_size, pos_integer()} | {cache_size, pos_integer()} |
-                   {block_size, pos_integer()} | {block_restart_interval, pos_integer()}].
--type readopts() :: [verify_checksums | skip_cache | {snapshot, snapshot()}].
+-type dbopts() :: [
+      create_if_missing
+    | error_if_exists
+    | paranoid_checks
+    | {write_buffer_size, pos_integer()}
+    | {cache_size, pos_integer()}
+    | {block_size, pos_integer()}
+    | {block_restart_interval, pos_integer()}
+].
+
+-type readopts() :: [
+      verify_checksums
+    | skip_cache
+    | {snapshot, snapshot()}
+].
+
 -type writeopts() :: [sync | snapshot].
 
 %% Iterators, keys, and values
@@ -17,7 +29,7 @@
 -type ival() :: iolist().
 -type key() :: binary().
 -type val() :: binary().
--type iteration_result() ::  not_found | {key(), val()} | error().
+
 
 %% Misc
 -type seek_dest() :: key() | first | last.

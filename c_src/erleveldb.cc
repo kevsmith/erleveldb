@@ -552,7 +552,7 @@ static ERL_NIF_TERM
 itvalue(ErlNifEnv* env, IterRes* res)
 {
     if(!res->iter->Valid()) {
-        return make_atom(env, "not_found");
+        return make_error(env, "not_found");
     }
 
     leveldb::Slice vslice = res->iter->value();
@@ -567,7 +567,7 @@ itvalue(ErlNifEnv* env, IterRes* res)
     buf = enif_make_new_binary(env, slice.size(), &val);
     memcpy(buf, slice.data(), slice.size());
     
-    return enif_make_tuple2(env, key, val);    
+    return make_ok(env, enif_make_tuple2(env, key, val));
 }
 
 static ERL_NIF_TERM

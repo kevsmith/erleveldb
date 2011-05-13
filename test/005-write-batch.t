@@ -34,9 +34,9 @@ test_add_rem(Db) ->
     ok = erleveldb:wb_del(Wb, "bing"),
     ok = erleveldb:wb_write(Wb),
     {ok, Iter} = erleveldb:iter(Db),
-    {<<"baz">>, <<"bam">>} = erleveldb:seek(Iter, first),
-    {<<"foo">>, <<"bar">>} = erleveldb:next(Iter),
-    not_found = erleveldb:next(Iter),
+    {ok, {<<"baz">>, <<"bam">>}} = erleveldb:seek(Iter, first),
+    {ok, {<<"foo">>, <<"bar">>}} = erleveldb:next(Iter),
+    {error, not_found} = erleveldb:next(Iter),
     ok.
 
 test_add_rem_same(Db) ->
