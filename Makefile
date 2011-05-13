@@ -1,14 +1,15 @@
 
 all: build
 
-%.beam: %.erl
-	erlc -o test/ $<
-
 build:
-	./rebar compile
+	@./rebar compile
+	@./rebar dialyze
 
 clean:
-	./rebar clean
+	@./rebar clean
+
+erl_clean:
+	@rm -fv ebin/*
 
 check: build test/etap.beam
-	prove test/*.t
+	@prove test/*.t
