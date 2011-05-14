@@ -27,42 +27,42 @@
 
 
 -export_type([db/0, iterator/0, write_batch/0, snapshot/0]).
--export_type([dbname/0, dbopts/0, readopts/0, writeopts/0]).
--export_type([ikey/0, ival/0, key/0, val/0, seek_dest/0]).
+-export_type([dbopts/0, readopts/0, writeopts/0, seek_dest/0]).
 
 
--spec open_db(dbname()) -> {ok, db()} | error().
+-spec open_db(iolist()) -> {ok, db()} | error().
 open_db(_Name) ->
     ?not_loaded.
 
--spec open_db(dbname(), dbopts()) -> {ok, db()} | error().
+-spec open_db(iolist(), dbopts()) -> {ok, db()} | error().
 open_db(_Name, _Opts) ->
     ?not_loaded.
 
 
--spec put(db(), ikey(), ival()) -> ok | error().
+-spec put(db(), iolist(), iolist()) -> ok | error().
 put(_Db, _Key, _Value) ->
     ?not_loaded.
 
--spec put(db(), ikey(), ival(), writeopts()) -> ok | {ok, val()} | error().
+-spec put(db(), iolist(), iolist(), writeopts()) ->
+        ok | {ok, binary()} | error().
 put(_Db, _Key, _Value, _Opts) ->
     ?not_loaded.
 
 
--spec get(db(), ikey()) -> {ok, val()} | error().
+-spec get(db(), iolist()) -> {ok, binary()} | error().
 get(_Db, _Key) ->
     ?not_loaded.
 
--spec get(db(), ikey(), readopts()) -> {ok, val()} | error().
+-spec get(db(), iolist(), readopts()) -> {ok, binary()} | error().
 get(_Db, _Key, _Opts) ->
     ?not_loaded.
 
 
--spec del(db(), ikey()) -> ok | error().
+-spec del(db(), iolist()) -> ok | error().
 del(_Db, _Key) ->
     ?not_loaded.
 
--spec del(db(), ikey(), writeopts()) -> ok | {ok, snapshot()} | error().
+-spec del(db(), iolist(), writeopts()) -> ok | {ok, snapshot()} | error().
 del(_Db, _Key, _Opts) ->
     ?not_loaded.
 
@@ -76,15 +76,15 @@ iter(_Db, _Opts) ->
     ?not_loaded.
 
 
--spec seek(iterator(), seek_dest()) -> {ok, {key(), val()}} | error().
+-spec seek(iterator(), seek_dest()) -> {ok, {binary(), binary()}} | error().
 seek(_Iter, _Key) ->
     ?not_loaded.
 
--spec next(iterator()) -> {ok, {key(), val()}} | error().
+-spec next(iterator()) -> {ok, {binary(), binary()}} | error().
 next(_Iter) ->
     ?not_loaded.
 
--spec prev(iterator()) -> {ok, {key(), val()}} | error().
+-spec prev(iterator()) -> {ok, {binary(), binary()}} | error().
 prev(_Iter) ->
     ?not_loaded.
 
@@ -94,13 +94,13 @@ batch(_Db) ->
     ?not_loaded.
 
 
--spec wb_put(write_batch(), ikey(), ival()) -> ok | error().
+-spec wb_put(write_batch(), iolist(), iolist()) -> ok | error().
 wb_put(Wb, Key, Val) when is_binary(Key) andalso is_binary(Val) ->
     wb_put0(Wb, Key, Val);
 wb_put(Wb, Key, Val) ->
     wb_put0(Wb, ?i2b(Key), ?i2b(Val)).
 
--spec wb_del(write_batch(), ikey()) -> ok | error().
+-spec wb_del(write_batch(), iolist()) -> ok | error().
 wb_del(Wb, Key) when is_binary(Key) ->
     wb_del0(Wb, Key);
 wb_del(Wb, Key) ->
@@ -127,13 +127,13 @@ snapshot(_Db) ->
 % Internal API
 
 %% @private
--spec wb_put0(write_batch(), key(), val()) -> ok | error().
+-spec wb_put0(write_batch(), binary(), binary()) -> ok | error().
 wb_put0(_Wb, _Key, _Val) ->
     ?not_loaded.
 
 
 %% @private
--spec wb_del0(write_batch(), key()) -> ok | error().
+-spec wb_del0(write_batch(), binary()) -> ok | error().
 wb_del0(_Wb, _Key) ->
     ?not_loaded.
 

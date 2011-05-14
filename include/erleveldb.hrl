@@ -5,7 +5,6 @@
 -type snapshot() :: term().
 
 %% Database names and various options
--type dbname() :: iolist().
 -type dbopts() :: [
       create_if_missing
     | error_if_exists
@@ -24,13 +23,6 @@
 
 -type writeopts() :: [sync | snapshot].
 
-%% Iterators, keys, and values
--type ikey() :: iolist().
--type ival() :: iolist().
--type key() :: binary().
--type val() :: binary().
-
-
 %% Misc
--type seek_dest() :: key() | first | last.
+-type seek_dest() :: iolist() | first | last.
 -type error() :: {error, any()}.
