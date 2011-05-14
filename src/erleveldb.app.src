@@ -1,7 +1,6 @@
 {application, erleveldb, [
     {description, "LevelDB NIF"},
-    %%{vsn, git},
-    {vsn, "0.1"},
+    {vsn, git},
     {registered, []},
     {applications, [kernel]}
 ]}.
