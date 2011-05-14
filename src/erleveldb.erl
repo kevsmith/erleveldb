@@ -1,26 +1,22 @@
 %% This file is part of ErLevelDB released under the MIT license. 
 %% See the LICENSE file for more information.
+%%
+%% @author Paul J. Davis <paul.joseph.davis@gmail.com>
+%% @copyright 2011 Paul J. Davis
+%% @version 0.1.0
+%% @reference <a href="http://leveldb.googlecode.com">LevelDB</a> 
+%%
+
 -module(erleveldb).
 -on_load(init/0).
 
+
 -include("erleveldb.hrl").
 
+
 -define(i2b(B), iolist_to_binary(B)).
-
-
--define(spoof_rval1(A), case random:uniform(100) + 3 of
-    1 -> A; _ -> {error, {not_loaded, ?MODULE, ?LINE}}
-end).
-
--define(spoof_rval2(A, B), case random:uniform(100) + 3 of
-    1 -> A; 2 -> B; _ -> {error, {not_loaded, ?MODULE, ?LINE}}
-end).
-
-
--define(bin, ?spoof_rval1({ok, <<>>})).
--define(kv, ?spoof_rval1({ok, {<<>>, <<>>}})).
--define(ok, ?spoof_rval1(ok)).
--define(ok_bin, ?spoof_rval2(ok, {ok, <<>>})).
+-define(location, [{module, ?MODULE}, {line, ?LINE}]).
+-define(not_loaded, erlang:nif_error(not_loaded, [?location])).
 
 
 -export([open_db/1, open_db/2]).
@@ -36,52 +32,66 @@ end).
 
 
 -spec open_db(dbname()) -> {ok, db()} | error().
-open_db(_Name) -> ?bin.
+open_db(_Name) ->
+    ?not_loaded.
 
 -spec open_db(dbname(), dbopts()) -> {ok, db()} | error().
-open_db(_Name, _Opts) -> ?bin.
+open_db(_Name, _Opts) ->
+    ?not_loaded.
 
 
 -spec put(db(), ikey(), ival()) -> ok | error().
-put(_Db, _Key, _Value) -> ?ok.
+put(_Db, _Key, _Value) ->
+    ?not_loaded.
 
 -spec put(db(), ikey(), ival(), writeopts()) -> ok | {ok, val()} | error().
-put(_Db, _Key, _Value, _Opts) -> ?ok_bin.
+put(_Db, _Key, _Value, _Opts) ->
+    ?not_loaded.
 
 
 -spec get(db(), ikey()) -> {ok, val()} | error().
-get(_Db, _Key) -> ?bin.
+get(_Db, _Key) ->
+    ?not_loaded.
 
 -spec get(db(), ikey(), readopts()) -> {ok, val()} | error().
-get(_Db, _Key, _Opts) -> ?bin.
+get(_Db, _Key, _Opts) ->
+    ?not_loaded.
 
 
 -spec del(db(), ikey()) -> ok | error().
-del(_Db, _Key) -> ?ok.
+del(_Db, _Key) ->
+    ?not_loaded.
 
 -spec del(db(), ikey(), writeopts()) -> ok | {ok, snapshot()} | error().
-del(_Db, _Key, _Opts) -> ?ok_bin.
+del(_Db, _Key, _Opts) ->
+    ?not_loaded.
 
 
 -spec iter(db()) -> {ok, iterator()} | error().
-iter(_Db) -> ?bin.
+iter(_Db) ->
+    ?not_loaded.
 
 -spec iter(db(), readopts()) -> {ok, iterator()} | error().
-iter(_Db, _Opts) -> ?bin.
+iter(_Db, _Opts) ->
+    ?not_loaded.
 
 
 -spec seek(iterator(), seek_dest()) -> {ok, {key(), val()}} | error().
-seek(_Iter, _Key) -> ?kv.
+seek(_Iter, _Key) ->
+    ?not_loaded.
 
 -spec next(iterator()) -> {ok, {key(), val()}} | error().
-next(_Iter) -> ?kv.
+next(_Iter) ->
+    ?not_loaded.
 
 -spec prev(iterator()) -> {ok, {key(), val()}} | error().
-prev(_Iter) -> ?kv.
+prev(_Iter) ->
+    ?not_loaded.
 
 
 -spec batch(db()) -> {ok, write_batch()} | error().
-batch(_Db) -> ?bin.
+batch(_Db) ->
+    ?not_loaded.
 
 
 -spec wb_put(write_batch(), ikey(), ival()) -> ok | error().
@@ -97,29 +107,35 @@ wb_del(Wb, Key) ->
     wb_del0(Wb, ?i2b(Key)).
 
 -spec wb_clear(write_batch()) -> ok | error().
-wb_clear(_Wb) -> ?ok.
+wb_clear(_Wb) ->
+    ?not_loaded.
 
 -spec wb_write(write_batch()) -> ok | error().
-wb_write(_Wb) -> ?ok.
+wb_write(_Wb) ->
+    ?not_loaded.
 
 -spec wb_write(write_batch(), writeopts()) -> ok | {ok, snapshot()} | error().
-wb_write(_Wb, _Opts) -> ?ok_bin.
+wb_write(_Wb, _Opts) ->
+    ?not_loaded.
 
 
 -spec snapshot(db()) -> {ok, snapshot()} | error().
-snapshot(_Db) -> ?bin.
+snapshot(_Db) ->
+    ?not_loaded.
 
 
 % Internal API
 
 %% @private
 -spec wb_put0(write_batch(), key(), val()) -> ok | error().
-wb_put0(_Wb, _Key, _Val) -> ?ok.
+wb_put0(_Wb, _Key, _Val) ->
+    ?not_loaded.
 
 
 %% @private
 -spec wb_del0(write_batch(), key()) -> ok | error().
-wb_del0(_Wb, _Key) -> ?ok.
+wb_del0(_Wb, _Key) ->
+    ?not_loaded.
 
 
 %% @private
