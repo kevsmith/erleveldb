@@ -21,7 +21,7 @@
 -define(not_loaded, erlang:nif_error(not_loaded, [?location])).
 
 
--export([open_db/1, open_db/2]).
+-export([open_db/1, open_db/2, destroy_db/1]).
 -export([put/3, put/4, get/2, get/3, del/2, del/3]).
 -export([iter/1, iter/2, seek/2, next/1, prev/1]).
 -export([batch/1, wb_put/3, wb_del/2, wb_clear/1, wb_write/1, wb_write/2]).
@@ -48,6 +48,14 @@ open_db(_Name) ->
 %% @see dbopts()
 -spec open_db(iolist(), dbopts()) -> {ok, db()} | error().
 open_db(_Name, _Opts) ->
+    ?not_loaded.
+
+
+%% @doc Destory an ErLevelDB database.
+%% The actual database destruction will not occurr until the
+%% db reference has been garbage collected.
+-spec destroy_db(db()) -> ok.
+destroy_db(_Db) ->
     ?not_loaded.
 
 

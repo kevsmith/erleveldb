@@ -33,6 +33,8 @@ typedef struct {
 typedef struct {
     ErlNifMutex*                lock;
     leveldb::DB*                db;
+    char*                       name;
+    bool                        destroy;
 } DBRes;
 
 typedef struct {
@@ -61,6 +63,11 @@ free_dbres(ErlNifEnv* env, void* obj)
     if(res->db != NULL) {
         delete res->db;
     }
+    if(res->destroy) {
+        leveldb::Options opts;
+        leveldb::DestroyDB(res->name, opts);
+    }
+    enif_free(res->name);
 }
 
 void
@@ -386,11 +393,16 @@ open_db(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         return enif_make_badarg(env);
     }
 
-    std::string dbname((const char*) bin.data, bin.size);
     
     DBRes* res = (DBRes*) enif_alloc_resource(st->db_res, sizeof(DBRes));
     res->lock = NULL;
     res->db = NULL;
+    res->name = (char*) enif_alloc(bin.size + 1);
+    memcpy(res->name, bin.data, bin.size);
+    res->name[bin.size] = '\0';
+    res->destroy = false;
+    
+    std::string dbname = std::string((const char*) bin.data, bin.size);
 
     leveldb::Status status = leveldb::DB::Open(opts, dbname, &(res->db));
     if(!status.ok()) {
@@ -402,6 +414,20 @@ open_db(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
     enif_release_resource(res);
     
     return make_ok(env, ret);
+}
+
+static ERL_NIF_TERM
+destroy_db(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+    State* st = (State*) enif_priv_data(env);
+    DBRes* res;
+    
+    if(!enif_get_resource(env, argv[0], st->db_res, (void**) &res)) {
+        return enif_make_badarg(env);
+    }
+
+    res->destroy = true;
+    return make_atom(env, "ok");
 }
 
 static ERL_NIF_TERM
@@ -795,7 +821,8 @@ static ErlNifFunc funcs[] =
 {
     {"open_db", 1, open_db},
     {"open_db", 2, open_db},
-    
+    {"destroy_db", 1, destroy_db},
+
     {"put", 3, dbput},
     {"put", 4, dbput},
     {"get", 2, dbget},
