@@ -566,7 +566,6 @@ dbiter(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         enif_release_resource(res);
         return make_error(env, "iterator_init_failed");
     }
-    res->iter->SeekToFirst();
 
     ERL_NIF_TERM ret = enif_make_resource(env, res);
     enif_release_resource(res);
@@ -615,14 +614,14 @@ itseek(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         if(res->iter->Valid()) {
             return itvalue(env, res);
         } else {
-            return make_atom(env, "not_found");
+            return make_error(env, "not_found");
         }
     } else if(ENIF_IS(argv[1], make_atom(env, "last"))) {
         res->iter->SeekToLast();
         if(res->iter->Valid()) {
             return itvalue(env, res);
         } else {
-            return make_atom(env, "not_found");
+            return make_error(env, "not_found");
         }
     } else if(enif_inspect_iolist_as_binary(env, argv[1], &key)) {
         leveldb::Slice skey((const char*) key.data, key.size);
@@ -630,7 +629,7 @@ itseek(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
         if(res->iter->Valid()) {
             return itvalue(env, res);
         } else {
-            return make_atom(env, "not_found");
+            return make_error(env, "not_found");
         }
     }
 
