@@ -8,15 +8,23 @@ num_writes() -> 1000.
 main(_) ->
     code:add_pathz("test"),
     code:add_pathz("ebin"),
-    etap:plan(5),
+    etap:plan(6),
     os:cmd("rm -rf " ++ dbname()),
     {ok, Db} = erleveldb:open_db(dbname(), [create_if_missing]),
+    etap:is(test_seek_no_kvs(Db), ok, "Seeks ok with no KVs"),
     etap:is(test_write_kvs(Db, num_writes()), ok, "Wrote k/v pairs."),
     etap:is(test_seek_forward(Db), ok, "Seeked forward."),
     etap:is(test_seek_reverse(Db), ok, "Seeked reverse."),
     etap:is(test_seek_key(Db), ok, "Seeked to key."),
     etap:is(test_iter_opts(Db), ok, "Iterators can be created with options."),
     etap:end_tests().
+
+test_seek_no_kvs(Db) ->
+    {ok, Iter} = erleveldb:iter(Db),
+    {error, not_found} = erleveldb:seek(Iter, first),
+    {error, not_found} = erleveldb:seek(Iter, last),
+    {error, not_found} = erleveldb:seek(Iter, "random_key"),
+    ok.
 
 test_write_kvs(_Db, 0) ->
     ok;

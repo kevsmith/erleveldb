@@ -85,6 +85,14 @@ already exists. You can use the `dbopts()` to create the database and
 optionally return an error if it already exists.
 
 
+## Destroying a database
+
+    destroy_db(db()) -> ok.
+
+The one caveat of this function is that the actual destruction is delayed
+until the db() reference has been garbage collected.
+
+
 ## Storing and Retrieving Data
 
     get(db(), ikey()) -> {ok, val()} | error().
